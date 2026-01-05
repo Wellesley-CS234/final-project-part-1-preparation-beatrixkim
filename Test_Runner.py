@@ -10,10 +10,10 @@ import sys
 # ⚠️ CHANGE 1: Set the key name for YOUR data (e.g., 'st05_df', 'st12_df', etc.)
 # IMPORTANT: This key MUST match the 'stN_df' key used in the main Home Page
 # and accessed by your analysis file.
-STUDENT_DATA_KEY = 'st07_df' 
+STUDENT_DATA_KEY = 'st14_df' 
 
 # ⚠️ CHANGE 2: Set the file path to YOUR Streamlit page (e.g., 'pages/07_⚽_Sports_Analysis.py')
-STUDENT_PAGE_PATH = 'pages/07_⚽_Sports_Analysis.py' 
+STUDENT_PAGE_PATH = 'pages/14_Category_Analysis.py' 
 
 # ----------------------------------------------------------------------
 # 2. DATA LOADING & REDIRECTION LOGIC (DO NOT EDIT BELOW THIS LINE)
