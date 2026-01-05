@@ -71,7 +71,7 @@ lang_map = {
 }
 
 # 2. Main Page stuff
-st.title("Climate Change Article Types Across Wikipedia Languages")
+st.title("Wikipedia Climate Change Article Types Across Languages")
 st.subheader("Exploring How Article Categories Vary Across the Top 25 Language Editions")
 
 st.markdown("""
@@ -86,14 +86,14 @@ WikiProject Climate Change. Each article was classified using Wikidata's "instan
 - **Human**: Scientists, politicians, etc.
 - **Organization**: Companies, NGOs, etc.
 - **Other**: Articles that don't fit the above categories
+- **None**: Articles that weren't an instance of any Wikidata type
 
-**Data Preparation:** Articles were queried from Wikidata, classified using P31 
-instance types expanded with P279 subclass hierarchies and merged with 
-Wikipedia article URLs across the top 25 language editions. 
-This method was used because initially, upon classifying articles solely
-on their PID, I noticed that many articles fell through the cracks—NGOs were
-not, for example, included under the organization category, so I revised my 
-approach to account for Wikidata's "subclass of" type (not a PID, but a QID).
+**Data Preparation:** Articles were queried from Wikidata using P31 
+types and P279 subclass hierarchies and merged with article URLs across 
+the top 25 language editions. This method was used because initially, 
+upon classifying articles solely on their PID, I noticed that many articles 
+fell through the cracks—NGOs were not, for example, included under the organization category, 
+so I revised my approach to account for Wikidata's "subclass of" type (not a PID, but a QID).
 """)
 
 st.markdown("---")
@@ -121,7 +121,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     # Widget 1: Select categories to display
-    category_order = ['event', 'concept', 'organization', 'human', 'none', 'other']
+    category_order = ['organization', 'concept', 'event', 'human', 'none', 'other']
     available_categories = [cat for cat in category_order if cat in pivot_pct_all.columns]
     
     category_options = st.multiselect(
@@ -149,22 +149,30 @@ with col2:
 col3, col4 = st.columns(2)
 
 with col3:
-    # Widget 3: Chart type
+    # Widget 3: Languages to show
+    language_options = [f"{lang_map.get(code, code)} ({code})" for code in top_25_languages]
+
+    selected_languages = st.multiselect(
+        "Select Languages to Display:",
+        options=language_options,
+        default=language_options # all
+    )
+
+    # Convert back to language codes
+    if len(selected_languages) == 0:
+        st.warning("Please select at least one language.")
+        st.stop()
+    
+    selected_lang_codes = [lang.split('(')[1].split(')')[0] for lang in selected_languages]
+
+
+with col4:
+    # Widget 4: Chart type
     chart_type = st.radio(
         "Display Type:",
         options=["Percentage (Stacked)", "Raw Counts (Stacked)", "Grouped Bars"],
         index=0,
         horizontal=True
-    )
-
-with col4:
-    # Widget 4: Number of languages to show
-    num_languages = st.slider(
-        "Number of Languages to Display:",
-        min_value=5,
-        max_value=25,
-        value=25,
-        step=5
     )
 
 # 5. Apply filters and sorting
@@ -178,20 +186,17 @@ pivot_pct_filtered = pivot_pct_all[category_options]
 
 # Apply sorting
 if sort_option == "Article Count (Descending)":
-    lang_order = lang_counts[top_25_languages].sort_values(ascending=False).index.tolist()
+    lang_order = lang_counts[selected_lang_codes].sort_values(ascending=False).index.tolist()
 elif sort_option == "Article Count (Ascending)":
-    lang_order = lang_counts[top_25_languages].sort_values(ascending=True).index.tolist()
+    lang_order = lang_counts[selected_lang_codes].sort_values(ascending=True).index.tolist()
 elif sort_option.startswith("Highest %"):
     category = sort_option.split("% ")[1].lower()
     if category in pivot_pct_all.columns:
         lang_order = pivot_pct_all[category].sort_values(ascending=False).index.tolist()
     else:
-        lang_order = top_25_languages
+        lang_order = selected_lang_codes
 else:
-    lang_order = top_25_languages
-
-# Limit to selected number of languages
-lang_order = lang_order[:num_languages]
+    lang_order = selected_lang_codes
 
 pivot_counts_display = pivot_counts_filtered.loc[lang_order]
 pivot_pct_display = pivot_pct_filtered.loc[lang_order]
@@ -339,7 +344,7 @@ with col1:
     st.metric("Total Articles", f"{total_articles:,}")
 
 with col2:
-    st.metric("Languages Analyzed", num_languages)
+    st.metric("Languages Analyzed", len(selected_lang_codes))
 
 with col3:
     st.metric("Article Types", len(category_options))
@@ -348,31 +353,11 @@ with col4:
     most_common = df_top25['category'].value_counts().index[0]
     st.metric("Most Common Type", most_common.capitalize())
 
-# 8. Key Findings
+# 8. Raw Data
 st.markdown("---")
-st.subheader("Key Findings")
+st.subheader("Data ")
 
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### Consistency Across Languages")
-    st.markdown("""
-    Despite vast differences in article counts (English: 2,991 vs Bulgarian: 216), 
-    the **proportional distribution remains remarkably similar** across all languages.
-    
-    This suggests Wikipedia's structural approach to climate change content is 
-    **globally standardized**, regardless of language or cultural context.
-    """)
-
-with col2:
-    st.markdown("### Category Breakdown")
-    overall_pct = (df_top25['category'].value_counts() / len(df_top25) * 100).round(1)
-    for cat in category_options:
-        if cat in overall_pct.index:
-            st.markdown(f"- **{cat.capitalize()}**: {overall_pct[cat]}%")
-
-# 9. Detailed Breakdown
-with st.expander("Show Detailed Breakdown by Language"):
+with st.expander("Detailed Breakdown by Language"):
     st.markdown("### Articles by Language and Type")
     
     summary_df = pivot_counts_display.copy()
@@ -387,29 +372,7 @@ with st.expander("Show Detailed Breakdown by Language"):
     
     st.dataframe(summary_pct.style.format("{:.1f}%"), use_container_width=True)
 
-# 10. Category Definitions
-with st.expander("Show Article Type Definitions"):
-    st.markdown("### How Articles Were Classified")
-    st.markdown("""
-    Articles were classified using Wikidata's **P31 (instance of)** property combined 
-    with **P279 (subclass of)** hierarchies to capture both direct instances and subclasses:
-    """)
-    
-    definitions = {
-        'concept': 'Scientific concepts, theories, properties, phenomena (e.g., greenhouse effect, carbon cycle)',
-        'event': 'Conferences, protests, disasters, climate summits (e.g., COP meetings, climate strikes)',
-        'human': 'Biographies of climate activists, scientists, politicians (e.g., Greta Thunberg, Al Gore)',
-        'organization': 'Companies, NGOs, government agencies, research institutions (e.g., IPCC, Greenpeace)',
-        'none': 'Articles with no instance type information in Wikidata',
-        'other': 'Articles that don\'t fit the above categories (technologies, geographic features, policies, etc.)'
-    }
-    
-    for cat in category_options:
-        if cat in definitions:
-            st.markdown(f"**{cat.capitalize()}:** {definitions[cat]}")
-
-# 11. Raw Data Sample
-with st.expander("Show Raw Data Sample"):
+with st.expander("Raw Data Sample"):
     st.markdown("### Sample of Classified Articles")
     
     display_df = df_top25.copy()
@@ -422,12 +385,11 @@ with st.expander("Show Raw Data Sample"):
     
     st.dataframe(sample_df, use_container_width=True)
 
+# 9. Conclusion
 st.markdown("---")
+st.subheader("Conclusion ")
 st.markdown("""
-**Conclusion:** Despite using an extended subclass hierarchy that significantly reduced 
-the "other" category, the distribution of article types remains remarkably consistent 
-across all 25 Wikipedia language editions, suggesting a globally standardized approach 
-to climate change coverage.
-
-*Created by [Your Name] for CS 248 Final Project*
+The distribution of article types remains relatively consistent 
+across the top 25 Wikipedia language editions, which perhaps suggests that the
+distribution of climate change coverage by article type is standard globally.
 """)
